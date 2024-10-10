@@ -12,6 +12,17 @@
 #include<fcntl.h> 
 using namespace std;
 
+struct Game{
+    vector<vector<string>> mazo;
+    vector<vector<string>> pila_descarte;
+    vector<vector<string>> mano_jugador;
+    vector<vector<string>> mano_bot1;
+    vector<vector<string>> mano_bot2;
+    vector<vector<string>> mano_bot3;
+    bool cambio_sentido;
+    int roba;
+};
+
 void create_mazo(vector<vector<string>>&vec){
     vector<string> aux;
     for(int i=0;i<10;i++){//Cartas de color entre 0 y 9
@@ -30,7 +41,7 @@ void create_mazo(vector<vector<string>>&vec){
                 vec.push_back(aux);
                 aux.clear();
                 aux.push_back(to_string(i));
-                aux.push_back("azul");
+                aux.push_back("verde");
                 vec.push_back(aux);
                 aux.clear();
             }
@@ -49,7 +60,7 @@ void create_mazo(vector<vector<string>>&vec){
             vec.push_back(aux);
             aux.clear();
             aux.push_back(to_string(i));
-            aux.push_back("azul");
+            aux.push_back("verde");
             vec.push_back(aux);
             aux.clear();
         }
@@ -68,7 +79,7 @@ void create_mazo(vector<vector<string>>&vec){
         vec.push_back(aux);
         aux.clear();
         aux.push_back("Cambio de sentido");
-        aux.push_back("azul");
+        aux.push_back("verde");
         vec.push_back(aux);
         aux.clear();
     }
@@ -86,7 +97,7 @@ void create_mazo(vector<vector<string>>&vec){
         vec.push_back(aux);
         aux.clear();
         aux.push_back("Salta");
-        aux.push_back("azul");
+        aux.push_back("verde");
         vec.push_back(aux);
         aux.clear();
     }
@@ -104,7 +115,7 @@ void create_mazo(vector<vector<string>>&vec){
         vec.push_back(aux);
         aux.clear();
         aux.push_back("Roba Dos");
-        aux.push_back("azul");
+        aux.push_back("verde");
         vec.push_back(aux);
         aux.clear();
     }
@@ -124,6 +135,13 @@ void create_mazo(vector<vector<string>>&vec){
     random_device dv;
     mt19937 g(dv());
     shuffle(vec.begin(),vec.end(),g);
+}
+
+void create_hand(vector<vector<string>>&vec, Game* shared_game){
+    for(int i = 0; i < 7; i++){
+        vec.push_back(shared_game->mazo[0]);
+        shared_game->mazo.erase(shared_game->mazo.begin());
+    }
 }
 
 void tirar_carta(vector<string>&carta,vector<vector<string>>&descarte){
@@ -151,62 +169,54 @@ void tirar_carta(vector<string>&carta,vector<vector<string>>&descarte){
 }
 
 int main(){
-    //Inicio del mazo
-    vector<vector<string>> mazo;
-    create_mazo(mazo);
-    vector<vector<string>> pila_descarte;
-    pila_descarte.push_back(mazo[0]);
-    mazo.erase(mazo.begin());
-
-    //Crear memoria compartida
-    int mem = shm_open("/memoria", O_CREAT | O_RDWR, 0666);
+    cout<<"--- Bienvenido a Uno ---"<<endl<<endl;
     
-    //Establecer tamanio memoria
-    size_t total_size = (mazo.size() + pila_descarte.size()) * sizeof(vector<vector<string>>);
-    ftruncate(mem, total_size);
+    //Crear memoria compartida
+    int mem = shmget(IPC_PRIVATE, sizeof(Game), IPC_CREAT|0666);
     
     //Mapear memoria compartida
-    vector<vector<string>>* shared_memory = (vector<vector<string>>*)mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, mem, 0);
+    Game* shared_game = (Game*)shmat(mem, nullptr, 0);
 
-    //Copiar elementos
-    for (size_t i = 0; i < mazo.size(); ++i) {
-        shared_memory[i].push_back(mazo[i]); // Copiar el primer vector
-    }
-    for (size_t i = 0; i < pila_descarte.size(); ++i) {
-        shared_memory[mazo.size() + i].push_back(pila_descarte[i]); // Copiar el segundo vector
-    }
-    
+    //Inicio del mazo/juego
+    create_mazo(shared_game->mazo);
+    cout<<"✓ Mazo creado"<<endl<<"✓ Mazo revuelto"<<endl<<endl;
+    shared_game->pila_descarte.push_back(shared_game->mazo[0]);
+    shared_game->mazo.erase(shared_game->mazo.begin());
+    shared_game->cambio_sentido = false;
+    shared_game->roba = 0;
+
     //Crear forks
-    int id1,id2,id3,id4;
-    id1 = fork();
-    if(id1==0){
-        //Mano1
-        vector<vector<string>> mano_jugador;
-        for(int i = 0; i < 7; i++){
-            mano_jugador.push_back(mazo[0]);
-            mazo.erase(mazo.begin());
+    int ids[4];
+
+    for(int i=0;i<4;i++){
+        ids[i]=fork();
+        if(ids[i]==0){
+            if(ids[i]==0&&i==0){//Mano jugador
+                cout<<"✓ Mano del jugador creada"<<endl;
+                create_hand(shared_game->mano_jugador,shared_game);
+                break;
+            }
+            else if(ids[i]==0&&i==1){//Mano bot1
+                cout<<"✓ Mano del bot1 creada"<<endl;
+                create_hand(shared_game->mano_bot1,shared_game);
+                break;
+            }
+            else if(ids[i]==0&&i==2){//Mano bot2
+                cout<<"✓ Mano del bot2 creada"<<endl;
+                create_hand(shared_game->mano_bot2,shared_game);
+                break;
+            }
+            else if(ids[i]==0&&i==3){//Mano bot3
+                cout<<"✓ Mano del bot3 creada"<<endl;
+                create_hand(shared_game->mano_bot3,shared_game);
+                break;
+            }
         }
-        id2 = fork();
     }
-    if(id2==0){
-        //Mano2
-        id3 = fork();
-    }
-    if(id3==0){
-        //Mano3
-        id4 = fork();
-    }
-    if(id4==0){
-        //Mano4
-    }
-    else{
+    for (int i=0;i<4;i++){
         wait(NULL);
     }
 
-    //Crear mano
-
     //Crear turnos
-
-    
     return 0;
 }
