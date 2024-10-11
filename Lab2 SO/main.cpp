@@ -9,7 +9,8 @@
 #include<unistd.h>
 #include<sys/wait.h>
 #include<sys/mman.h>
-#include<fcntl.h> 
+#include<fcntl.h>
+#include<semaphore.h>
 using namespace std;
 
 struct Game{
@@ -19,8 +20,16 @@ struct Game{
     vector<vector<string>> mano_bot1;
     vector<vector<string>> mano_bot2;
     vector<vector<string>> mano_bot3;
+    sem_t semaforo1;
+    sem_t semaforo2;
+    sem_t semaforo3;
+    sem_t semaforo4;
     bool cambio_sentido;
+    int pos;
     int roba;
+    bool terminar_game;
+    bool roba_uno;
+    int pids[4];
 };
 
 void create_mazo(vector<vector<string>>&vec){
@@ -144,27 +153,298 @@ void create_hand(vector<vector<string>>&vec, Game* shared_game){
     }
 }
 
-void tirar_carta(vector<string>&carta,vector<vector<string>>&descarte){
-    vector<string>carta_ds=descarte[descarte.size()-1];
+void robar_carta(Game* shared_game, int &pos){
+    if(pos==0){
+        shared_game->mano_jugador.push_back(shared_game->mazo[0]);
+        shared_game->mazo.erase(shared_game->mazo.begin());
+    }
+    else if(pos==1){
+        shared_game->mano_bot1.push_back(shared_game->mazo[0]);
+        shared_game->mazo.erase(shared_game->mazo.begin());
+    }
+    else if(pos==2){
+        shared_game->mano_bot2.push_back(shared_game->mazo[0]);
+        shared_game->mazo.erase(shared_game->mazo.begin());
+    }
+    else if(pos==3){
+        shared_game->mano_bot3.push_back(shared_game->mazo[0]);
+        shared_game->mazo.erase(shared_game->mazo.begin());
+    }
+}
+
+void borra_carta(vector<string>&carta,Game* shared_game, int &pos){
+    if(pos==0){
+        for(int i = 0; i < shared_game->mano_jugador.size(); i++){
+            if(shared_game->mano_jugador[i] == carta){
+                swap(shared_game->mano_jugador[0], shared_game->mano_jugador[i]);
+                shared_game->mazo.erase(shared_game->mazo.begin());
+                break;
+            }
+        }
+    }
+    else if(pos==1){
+        for(int i = 0; i < shared_game->mano_bot1.size(); i++){
+            if(shared_game->mano_bot1[i] == carta){
+                swap(shared_game->mano_bot1[0], shared_game->mano_bot1[i]);
+                shared_game->mazo.erase(shared_game->mazo.begin());
+                break;
+            }
+        }
+    }
+    else if(pos==2){
+        for(int i = 0; i < shared_game->mano_bot2.size(); i++){
+            if(shared_game->mano_bot2[i] == carta){
+                swap(shared_game->mano_bot1[0], shared_game->mano_bot2[i]);
+                shared_game->mazo.erase(shared_game->mazo.begin());
+                break;
+            }
+        }
+    }
+    else if(pos==3){
+        for(int i = 0; i < shared_game->mano_bot3.size(); i++){
+            if(shared_game->mano_bot3[i] == carta){
+                swap(shared_game->mano_bot1[0], shared_game->mano_bot3[i]);
+                shared_game->mazo.erase(shared_game->mazo.begin());
+                break;
+            }
+        }
+    }
+}
+
+bool probar_carta(vector<string>&carta,Game* shared_game, int &pos){
+    vector<string>carta_ds=shared_game->pila_descarte[shared_game->pila_descarte.size()-1];
     if(carta[1]=="negro"){//Comodines
         if(carta[0]=="Comodin"){
             //Hacer lo que deba hacer
+            int color;
+            if(pos == 0){
+                bool valido = false;
+                while(valido == false){
+                    cout<<"¿A qué color deseas cambiar?"<<endl;
+                    cout<<"(0) Rojo"<< endl; 
+                    cout<<"(1) Azul"<< endl; 
+                    cout<<"(2) Amarillo"<<endl; 
+                    cout<<"(3) Verde"<<endl; 
+                    cin >> color;
+                    if(color!=0&&color!=1&&color!=2&&color!=3){
+                        cout<<"¡Warning! Has escogido un índice no existente. Vuelve a escoger."<<endl;
+                    }
+                    else{
+                        valido = true;
+                    }
+                }
+            }
+            else{
+                random_device rd;
+                mt19937 gen(rd());
+                uniform_int_distribution<> distrib(0, 4);
+                color = distrib(gen);
+            }
+            if(color==0){
+                shared_game->pila_descarte[0][1] = "rojo";
+                borra_carta(carta, shared_game, pos);
+            }
+            else if(color==1){
+                shared_game->pila_descarte[0][1] = "azul";
+                borra_carta(carta, shared_game, pos);
+            }
+            else if(color==2){
+                shared_game->pila_descarte[0][1] = "amarillo";
+                borra_carta(carta, shared_game, pos);
+            }
+            else if(color==3){
+                shared_game->pila_descarte[0][1] = "verde";
+                borra_carta(carta, shared_game, pos);
+            }
         }
         else if(carta[0]=="Comodin Roba Cuatro"){
             //Hacer lo que deba hacer
+            int color;
+            if(pos == 0){
+                bool valido = false;
+                while(valido == false){
+                    cout<<"¿A qué color deseas cambiar?"<<endl;
+                    cout<<"(0) Rojo"<< endl; 
+                    cout<<"(1) Azul"<< endl; 
+                    cout<<"(2) Amarillo"<<endl; 
+                    cout<<"(3) Verde"<<endl; 
+                    cin >> color;
+                    if(color!=0&&color!=1&&color!=2&&color!=3){
+                        cout<<"¡Warning! Has escogido un índice no existente. Vuelve a escoger."<<endl;
+                    }
+                    else{
+                        valido = true;
+                    }
+                }
+            }
+            else{
+                random_device rd;
+                mt19937 gen(rd());
+                uniform_int_distribution<> distrib(0, 4);
+                color = distrib(gen);
+            }
+            if(color==0){
+                shared_game->pila_descarte[0][1] = "rojo";
+                shared_game->roba = 4;
+                borra_carta(carta, shared_game, pos);
+            }
+            else if(color==1){
+                shared_game->pila_descarte[0][1] = "azul";
+                shared_game->roba = 4;
+                borra_carta(carta, shared_game, pos);
+            }
+            else if(color==2){
+                shared_game->pila_descarte[0][1] = "amarillo";
+                shared_game->roba = 4;
+                borra_carta(carta, shared_game, pos);
+            }
+            else if(color==3){
+                shared_game->pila_descarte[0][1] = "verde";
+                shared_game->roba = 4;
+                borra_carta(carta, shared_game, pos);
+            }
         }
     }
     else if(carta[0]=="Roba Dos"&&carta[1]==carta_ds[1]){//Roba 2
         //Hacer lo que deba hacer
+        shared_game->pila_descarte.pop_back();
+        shared_game->pila_descarte.push_back(carta);
+        borra_carta(carta, shared_game, pos);
+        shared_game->roba = 2;
     }
     else if(carta[0]=="Salta"&&carta[1]==carta_ds[1]){//Salta
         //Hacer lo que deba hacer
+        shared_game->pila_descarte.pop_back();
+        shared_game->pila_descarte.push_back(carta);
+        borra_carta(carta, shared_game, pos);   
+        if(shared_game->cambio_sentido == true){
+            shared_game->pos -= 1;
+        }
+        else{
+            shared_game->pos += 1;
+        }
     }
     else if(carta[0]=="Cambio de sentido"&&carta[1]==carta_ds[1]){//Cambio de sentido
         //Hacer lo que deba hacer
+        borra_carta(carta, shared_game, pos);
+        if(shared_game->cambio_sentido == true){
+            shared_game->cambio_sentido = false;
+        }
+        else{
+            shared_game->cambio_sentido = true;
+        }
     }
     else if(carta[0]==carta_ds[0]||carta[1]==carta_ds[1]){//Tira una carta numerica
         //Hacer lo que deba hacer
+        shared_game->pila_descarte.erase(shared_game->pila_descarte.begin());
+        shared_game->pila_descarte.push_back(carta);
+        cout<<shared_game->pila_descarte[0][0]<<" "<<shared_game->pila_descarte[0][1]<<endl;
+        borra_carta(carta, shared_game, pos);
+    }
+    else{
+        return true;
+    }
+    return false;
+}
+
+void elegir_carta(vector<string>&carta,Game* shared_game,int &pos){
+    if(pos==0){//jugador
+        cout<<"Es tu turno!!"<<endl;
+        int i, elec;
+        bool intento=true;
+        while(intento==true){
+            for(i=0;i<shared_game->mano_jugador.size();i++){
+                cout<<"("<<i<<") "<<shared_game->mano_jugador[i][0]<<" "<<shared_game->mano_jugador[i][1]<<endl;
+            }
+            cout<<"("<<i<<") No tirar carta"<<endl;
+            if(shared_game->roba_uno==true){
+                cout<<"("<<i+1<<") Sacar una carta del mazo"<<endl;
+            }
+            cout<<"Carta a escoger: ";cin>>elec;
+            if(elec>=0 && elec<shared_game->mano_jugador.size()){
+                intento=false;
+                carta.push_back(shared_game->mano_jugador[elec][0]);
+                carta.push_back(shared_game->mano_jugador[elec][1]);
+            }
+            else if(elec==shared_game->mano_jugador.size()){
+                intento=false;
+            }
+            else if(elec==(shared_game->mano_jugador.size()+1)&&shared_game->roba_uno==true){
+                shared_game->roba_uno=false;
+                shared_game->mano_jugador.push_back(shared_game->mazo[0]);
+                shared_game->mazo.erase(shared_game->mazo.begin());
+            }
+            else{
+                cout<<"¡Warning! Has escogido un índice no existente. Vuelve a escoger."<<endl;
+            }
+        }
+    }
+    else if(pos==1){//bot1
+        cout<<"soy bot1"<<endl;
+        int i=0;
+        bool intento;
+        while(i<shared_game->mano_bot1.size()){
+            carta.push_back(shared_game->mano_bot1[i][0]);
+            carta.push_back(shared_game->mano_bot1[i][1]);
+            intento=probar_carta(carta,shared_game,pos);
+            if(intento==false){
+                i=shared_game->mano_bot1.size();
+            }
+            i++;
+            carta.clear();
+        }
+        if(intento==true){
+            carta.push_back(shared_game->mazo[i][0]);
+            carta.push_back(shared_game->mazo[i][1]);
+            shared_game->mazo.erase(shared_game->mazo.begin());
+            shared_game->mano_bot1.push_back(carta);
+            intento=probar_carta(carta,shared_game,pos);
+            carta.clear();
+        }
+    }
+    else if(pos==2){//bot2
+        int i=0;
+        bool intento;
+        while(i<shared_game->mano_bot2.size()){
+            carta.push_back(shared_game->mano_bot2[i][0]);
+            carta.push_back(shared_game->mano_bot2[i][1]);
+            intento=probar_carta(carta,shared_game,pos);
+            if(intento==false){
+                i=shared_game->mano_bot2.size();
+            }
+            i++;
+            carta.clear();
+        }
+        if(intento==true){
+            carta.push_back(shared_game->mazo[i][0]);
+            carta.push_back(shared_game->mazo[i][1]);
+            shared_game->mazo.erase(shared_game->mazo.begin());
+            shared_game->mano_bot2.push_back(carta);
+            intento=probar_carta(carta,shared_game,pos);
+            carta.clear();
+        }
+    }
+    else if(pos==3){//bot3
+        int i=0;
+        bool intento;
+        while(i<shared_game->mano_bot3.size()){
+            carta.push_back(shared_game->mano_bot3[i][0]);
+            carta.push_back(shared_game->mano_bot3[i][1]);
+            intento=probar_carta(carta,shared_game,pos);
+            if(intento==false){
+                i=shared_game->mano_bot3.size();
+            }
+            i++;
+            carta.clear();
+        }
+        if(intento==true){
+            carta.push_back(shared_game->mazo[i][0]);
+            carta.push_back(shared_game->mazo[i][1]);
+            shared_game->mazo.erase(shared_game->mazo.begin());
+            shared_game->mano_bot3.push_back(carta);
+            intento=probar_carta(carta,shared_game,pos);
+            carta.clear();
+        }
     }
 }
 
@@ -183,9 +463,19 @@ int main(){
     shared_game->pila_descarte.push_back(shared_game->mazo[0]);
     shared_game->mazo.erase(shared_game->mazo.begin());
     shared_game->cambio_sentido = false;
+    shared_game->terminar_game = false;
     shared_game->roba = 0;
+    shared_game->roba_uno = true;
+    shared_game->pos = 0;
+    
+    //Crear semaforos
+    sem_init(&shared_game->semaforo1, 1, 0); 
+    sem_init(&shared_game->semaforo2, 1, 0);
+    sem_init(&shared_game->semaforo3, 1, 0);
+    sem_init(&shared_game->semaforo4, 1, 0);
 
     //Crear forks
+    pid_t pid_padre = getpid();
     int ids[4];
 
     for(int i=0;i<4;i++){
@@ -194,29 +484,152 @@ int main(){
             if(ids[i]==0&&i==0){//Mano jugador
                 cout<<"✓ Mano del jugador creada"<<endl;
                 create_hand(shared_game->mano_jugador,shared_game);
+                shared_game->pids[i] = getpid();
+                sem_wait(&shared_game->semaforo1);
                 break;
             }
             else if(ids[i]==0&&i==1){//Mano bot1
                 cout<<"✓ Mano del bot1 creada"<<endl;
                 create_hand(shared_game->mano_bot1,shared_game);
+                shared_game->pids[i] = getpid();
+                sem_wait(&shared_game->semaforo2);
                 break;
             }
             else if(ids[i]==0&&i==2){//Mano bot2
                 cout<<"✓ Mano del bot2 creada"<<endl;
                 create_hand(shared_game->mano_bot2,shared_game);
+                shared_game->pids[i] = getpid();
+                sem_wait(&shared_game->semaforo3);
                 break;
             }
             else if(ids[i]==0&&i==3){//Mano bot3
-                cout<<"✓ Mano del bot3 creada"<<endl;
+                cout<<"✓ Mano del bot3 creada"<<endl<<endl;
                 create_hand(shared_game->mano_bot3,shared_game);
+                shared_game->pids[i] = getpid();
+                cout << shared_game->pids[i]<<endl;
+                sem_wait(&shared_game->semaforo4);
                 break;
             }
         }
     }
-    for (int i=0;i<4;i++){
-        wait(NULL);
-    }
 
     //Crear turnos
+    if(getpid()!=pid_padre){
+        while(shared_game->terminar_game==false){
+            //Esperar el turno
+            if(shared_game->pids[0] == getpid()){
+                sem_wait(&shared_game->semaforo1);
+            }
+            else if(shared_game->pids[1] == getpid()){
+                sem_wait(&shared_game->semaforo2);
+            }
+            else if(shared_game->pids[2] == getpid()){
+                sem_wait(&shared_game->semaforo3);
+            }
+            else if(shared_game->pids[3] == getpid()){
+                sem_wait(&shared_game->semaforo4);
+            }
+            cout<<"estoy en mi turno"<<endl;
+            //Comprobar final
+            if(shared_game->pos == 4){
+                break;
+            }
+
+            //Comprobar roba carta
+            if(shared_game->roba != 0){
+                for(int i = 0; i < shared_game->roba; i++){
+                    robar_carta(shared_game, shared_game->pos);
+                }
+                shared_game->roba = 0;
+            }
+
+            //Tirar alguna carta
+            cout<<"Carta actual pila descarte: "<<shared_game->pila_descarte[0][0]<<" "<<shared_game->pila_descarte[0][1]<<endl;
+            if(shared_game->pos==0){
+                bool intento=true;
+                while(intento==true){
+                    vector<string>carta;
+                    elegir_carta(carta,shared_game,shared_game->pos);
+                    intento=probar_carta(carta,shared_game,shared_game->pos);
+                    if(intento==true){
+                        cout<<"Su carta no puede ser usada en este turno. Vuelva a intentar"<<endl;
+                    }
+                    carta.clear();
+                }
+            }
+            else{
+                vector<string>carta;
+                elegir_carta(carta,shared_game,shared_game->pos);
+                carta.clear();
+            }
+            //Siguiente turno
+            if(shared_game->cambio_sentido==false){
+                shared_game->pos=(shared_game->pos)+1;
+                if(shared_game->pos>=4){
+                    shared_game->pos=0;
+                }
+            }
+            else{
+                shared_game->pos=shared_game->pos-1;
+                if(shared_game->pos<=-1){
+                    shared_game->pos=3;
+                }
+            }
+
+            //Comprobar si alguien gana
+            if(shared_game->mano_bot1.size()==0||shared_game->mano_bot2.size()==0||shared_game->mano_bot3.size()==0||shared_game->mano_jugador.size()==0||shared_game->mazo.size()==0){
+                shared_game->terminar_game=true;
+                shared_game->pos = 4;
+            }
+
+            //Liberar a los otros jugadores
+            cout<<"estoy liberando a un compatriota"<<endl;
+            cout<<shared_game->pos<<endl;
+            if(shared_game->pos == 0){
+                sem_post(&shared_game->semaforo1);
+            }
+            else if(shared_game->pos == 1){
+                sem_post(&shared_game->semaforo2);
+            }
+            else if(shared_game->pos == 2){
+                sem_post(&shared_game->semaforo3);
+            }
+            else if(shared_game->pos == 3){
+                sem_post(&shared_game->semaforo4);
+            }
+        }
+    }
+    else{
+        sem_post(&shared_game->semaforo1);
+        sem_post(&shared_game->semaforo2);
+        sem_post(&shared_game->semaforo3);
+        sem_post(&shared_game->semaforo4);
+        sleep(2);
+    }
+    //Revisar quien tiene 0 cartas y es el ganador 
+    if(shared_game->mano_jugador.size()==0){
+        cout<<"¡Ganáste, felicidades! :]"<<endl;
+    }
+    else if(shared_game->mano_bot1.size()==0){
+        cout<<"Ganó bot1, mejor suerte la próxima vez"<<endl;
+    }
+    else if(shared_game->mano_bot2.size()==0){
+        cout<<"Ganó bot2, mejor suerte la próxima vez"<<endl;
+    }
+    else if(shared_game->mano_bot3.size()==0){
+        cout<<"Ganó bot3, mejor suerte la próxima vez"<<endl;
+    }
+    else if(shared_game->mazo.size()==0){
+        cout<<"Ganó el mazo XD"<<endl;
+    }
+    sleep(1);
+    sem_post(&shared_game->semaforo1);
+    //Proceso padre espera a los hijos
+    for(int i=0;i<4;i++){
+        wait(NULL);
+    }
+    //Eliminar memoria compartida
+    shmdt(shared_game);
+    shmctl(mem, IPC_RMID, nullptr); 
     return 0;
 }
