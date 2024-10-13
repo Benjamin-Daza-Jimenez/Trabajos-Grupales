@@ -146,14 +146,14 @@ void create_mazo(vector<vector<string>>&vec){
     shuffle(vec.begin(),vec.end(),g);
 }
 
-void create_hand(vector<vector<string>>&vec, Game* shared_game){
+void create_hand(vector<vector<string>>&vec, Game* &shared_game){
     for(int i = 0; i < 7; i++){
         vec.push_back(shared_game->mazo[0]);
         shared_game->mazo.erase(shared_game->mazo.begin());
     }
 }
 
-void robar_carta(Game* shared_game, int &pos){
+void robar_carta(Game* &shared_game, int &pos){
     if(pos==0){
         shared_game->mano_jugador.push_back(shared_game->mazo[0]);
         shared_game->mazo.erase(shared_game->mazo.begin());
@@ -172,50 +172,53 @@ void robar_carta(Game* shared_game, int &pos){
     }
 }
 
-void borra_carta(vector<string>&carta,Game* shared_game, int &pos){
+void borra_carta(vector<string>&carta,Game* &shared_game, int &pos){
     if(pos==0){
-        for(int i = 0; i < shared_game->mano_jugador.size(); i++){
+        int tam=shared_game->mano_jugador.size();
+        for(int i = 0; i < tam; i++){
             if(shared_game->mano_jugador[i] == carta){
                 swap(shared_game->mano_jugador[0], shared_game->mano_jugador[i]);
-                shared_game->mazo.erase(shared_game->mazo.begin());
+                shared_game->mano_jugador.erase(shared_game->mano_jugador.begin());
                 break;
             }
         }
     }
     else if(pos==1){
-        for(int i = 0; i < shared_game->mano_bot1.size(); i++){
+        int tam=shared_game->mano_bot1.size();
+        for(int i = 0; tam; i++){
             if(shared_game->mano_bot1[i] == carta){
                 swap(shared_game->mano_bot1[0], shared_game->mano_bot1[i]);
-                shared_game->mazo.erase(shared_game->mazo.begin());
+                shared_game->mano_bot1.erase(shared_game->mazo.begin());
                 break;
             }
         }
     }
     else if(pos==2){
-        for(int i = 0; i < shared_game->mano_bot2.size(); i++){
+        int tam=shared_game->mano_bot2.size();
+        for(int i = 0; i < tam; i++){
             if(shared_game->mano_bot2[i] == carta){
                 swap(shared_game->mano_bot1[0], shared_game->mano_bot2[i]);
-                shared_game->mazo.erase(shared_game->mazo.begin());
+                shared_game->mano_bot2.erase(shared_game->mano_bot2.begin());
                 break;
             }
         }
     }
     else if(pos==3){
-        for(int i = 0; i < shared_game->mano_bot3.size(); i++){
+        int tam=shared_game->mano_bot3.size();
+        for(int i = 0; i < tam; i++){
             if(shared_game->mano_bot3[i] == carta){
                 swap(shared_game->mano_bot1[0], shared_game->mano_bot3[i]);
-                shared_game->mazo.erase(shared_game->mazo.begin());
+                shared_game->mano_bot3.erase(shared_game->mano_bot3.begin());
                 break;
             }
         }
     }
 }
 
-bool probar_carta(vector<string>&carta,Game* shared_game, int &pos){
+bool probar_carta(vector<string>&carta,Game* &shared_game, int &pos){
     vector<string>carta_ds=shared_game->pila_descarte[shared_game->pila_descarte.size()-1];
     if(carta[1]=="negro"){//Comodines
         if(carta[0]=="Comodin"){
-            //Hacer lo que deba hacer
             int color;
             if(pos == 0){
                 bool valido = false;
@@ -347,29 +350,33 @@ bool probar_carta(vector<string>&carta,Game* shared_game, int &pos){
     return false;
 }
 
-void elegir_carta(vector<string>&carta,Game* shared_game,int &pos){
+void elegir_carta(vector<string>&carta,Game* &shared_game,int &pos){
     if(pos==0){//jugador
         cout<<"Es tu turno!!"<<endl;
         int i, elec;
         bool intento=true;
         while(intento==true){
-            for(i=0;i<shared_game->mano_jugador.size();i++){
+            int tam=shared_game->mano_jugador.size();
+            for(i=0;i<tam;i++){
                 cout<<"("<<i<<") "<<shared_game->mano_jugador[i][0]<<" "<<shared_game->mano_jugador[i][1]<<endl;
             }
-            cout<<"("<<i<<") No tirar carta"<<endl;
             if(shared_game->roba_uno==true){
-                cout<<"("<<i+1<<") Sacar una carta del mazo"<<endl;
+                cout<<"("<<i<<") Sacar una carta del mazo"<<endl;
+            }
+            if(shared_game->roba_uno==false){
+                cout<<"("<<i<<") No tirar carta"<<endl;
             }
             cout<<"Carta a escoger: ";cin>>elec;
-            if(elec>=0 && elec<shared_game->mano_jugador.size()){
+            if(elec>=0 && elec<tam){
                 intento=false;
                 carta.push_back(shared_game->mano_jugador[elec][0]);
                 carta.push_back(shared_game->mano_jugador[elec][1]);
             }
-            else if(elec==shared_game->mano_jugador.size()){
+            else if(elec==tam&&shared_game->roba_uno==false){
                 intento=false;
+                shared_game->roba_uno=true;
             }
-            else if(elec==(shared_game->mano_jugador.size()+1)&&shared_game->roba_uno==true){
+            else if(elec==tam&&shared_game->roba_uno==true){
                 shared_game->roba_uno=false;
                 shared_game->mano_jugador.push_back(shared_game->mazo[0]);
                 shared_game->mazo.erase(shared_game->mazo.begin());
@@ -380,15 +387,14 @@ void elegir_carta(vector<string>&carta,Game* shared_game,int &pos){
         }
     }
     else if(pos==1){//bot1
-        cout<<"soy bot1"<<endl;
-        int i=0;
-        bool intento;
-        while(i<shared_game->mano_bot1.size()){
+        int i=0, tam=shared_game->mano_bot1.size();
+        bool intento=true;
+        while(i<tam&&intento==true){
             carta.push_back(shared_game->mano_bot1[i][0]);
             carta.push_back(shared_game->mano_bot1[i][1]);
             intento=probar_carta(carta,shared_game,pos);
             if(intento==false){
-                i=shared_game->mano_bot1.size();
+                i=tam;
             }
             i++;
             carta.clear();
@@ -403,9 +409,9 @@ void elegir_carta(vector<string>&carta,Game* shared_game,int &pos){
         }
     }
     else if(pos==2){//bot2
-        int i=0;
-        bool intento;
-        while(i<shared_game->mano_bot2.size()){
+        int i=0, tam=shared_game->mano_bot2.size();
+        bool intento=true;
+        while(i<tam&&intento==true){
             carta.push_back(shared_game->mano_bot2[i][0]);
             carta.push_back(shared_game->mano_bot2[i][1]);
             intento=probar_carta(carta,shared_game,pos);
@@ -426,8 +432,9 @@ void elegir_carta(vector<string>&carta,Game* shared_game,int &pos){
     }
     else if(pos==3){//bot3
         int i=0;
-        bool intento;
-        while(i<shared_game->mano_bot3.size()){
+        bool intento=true;
+        int tam=shared_game->mano_bot3.size();
+        while(i<tam&&intento==true){
             carta.push_back(shared_game->mano_bot3[i][0]);
             carta.push_back(shared_game->mano_bot3[i][1]);
             intento=probar_carta(carta,shared_game,pos);
@@ -460,8 +467,19 @@ int main(){
     //Inicio del mazo/juego
     create_mazo(shared_game->mazo);
     cout<<"✓ Mazo creado"<<endl<<"✓ Mazo revuelto"<<endl<<endl;
-    shared_game->pila_descarte.push_back(shared_game->mazo[0]);
-    shared_game->mazo.erase(shared_game->mazo.begin());
+    //Crear pila descarte evitando comodines
+    int tam=shared_game->mazo.size();
+    for(int i = 0; i < tam; i++){
+        if(shared_game->mazo[i][1] != "negro"){
+            shared_game->pila_descarte.push_back(shared_game->mazo[0]);
+            shared_game->mazo.erase(shared_game->mazo.begin());
+            break;
+        }
+        else{
+            shared_game->mazo.push_back(shared_game->mazo[i]);
+            shared_game->mazo.erase(shared_game->mazo.begin());
+        }
+    }
     shared_game->cambio_sentido = false;
     shared_game->terminar_game = false;
     shared_game->roba = 0;
@@ -506,7 +524,6 @@ int main(){
                 cout<<"✓ Mano del bot3 creada"<<endl<<endl;
                 create_hand(shared_game->mano_bot3,shared_game);
                 shared_game->pids[i] = getpid();
-                cout << shared_game->pids[i]<<endl;
                 sem_wait(&shared_game->semaforo4);
                 break;
             }
@@ -529,10 +546,9 @@ int main(){
             else if(shared_game->pids[3] == getpid()){
                 sem_wait(&shared_game->semaforo4);
             }
-            cout<<"estoy en mi turno"<<endl;
             //Comprobar final
             if(shared_game->pos == 4){
-                break;
+                exit(0);
             }
 
             //Comprobar roba carta
@@ -550,7 +566,12 @@ int main(){
                 while(intento==true){
                     vector<string>carta;
                     elegir_carta(carta,shared_game,shared_game->pos);
-                    intento=probar_carta(carta,shared_game,shared_game->pos);
+                    if(carta.size()>0){
+                        intento=probar_carta(carta,shared_game,shared_game->pos);
+                    }
+                    else{
+                        break;
+                    }
                     if(intento==true){
                         cout<<"Su carta no puede ser usada en este turno. Vuelva a intentar"<<endl;
                     }
@@ -580,11 +601,10 @@ int main(){
             if(shared_game->mano_bot1.size()==0||shared_game->mano_bot2.size()==0||shared_game->mano_bot3.size()==0||shared_game->mano_jugador.size()==0||shared_game->mazo.size()==0){
                 shared_game->terminar_game=true;
                 shared_game->pos = 4;
+                exit(0);
             }
 
             //Liberar a los otros jugadores
-            cout<<"estoy liberando a un compatriota"<<endl;
-            cout<<shared_game->pos<<endl;
             if(shared_game->pos == 0){
                 sem_post(&shared_game->semaforo1);
             }
@@ -606,28 +626,75 @@ int main(){
         sem_post(&shared_game->semaforo4);
         sleep(2);
     }
-    //Revisar quien tiene 0 cartas y es el ganador 
-    if(shared_game->mano_jugador.size()==0){
-        cout<<"¡Ganáste, felicidades! :]"<<endl;
-    }
-    else if(shared_game->mano_bot1.size()==0){
-        cout<<"Ganó bot1, mejor suerte la próxima vez"<<endl;
-    }
-    else if(shared_game->mano_bot2.size()==0){
-        cout<<"Ganó bot2, mejor suerte la próxima vez"<<endl;
-    }
-    else if(shared_game->mano_bot3.size()==0){
-        cout<<"Ganó bot3, mejor suerte la próxima vez"<<endl;
-    }
-    else if(shared_game->mazo.size()==0){
-        cout<<"Ganó el mazo XD"<<endl;
-    }
-    sleep(1);
     sem_post(&shared_game->semaforo1);
     //Proceso padre espera a los hijos
     for(int i=0;i<4;i++){
         wait(NULL);
     }
+    //Revisar quien tiene 0 cartas y es el ganador 
+    if(shared_game->mano_jugador.size()==0){
+        cout<<"¡Ganáste, felicidades! :]"<<endl;
+        cout<<"Cantidad de cartas restantes de los demás juagdores:"<<endl;
+        cout<<"Bot1: "<<shared_game->mano_bot1.size()<<endl;
+        cout<<"Bot2: "<<shared_game->mano_bot2.size()<<endl;
+        cout<<"Bot3: "<<shared_game->mano_bot3.size()<<endl;
+    }
+    else if(shared_game->mano_bot1.size()==0){
+        cout<<"Ganó bot1, mejor suerte la próxima vez"<<endl;
+        cout<<"Cantidad de cartas restantes de los demás juagdores:"<<endl;
+        cout<<"Jugador: "<<shared_game->mano_jugador.size()<<endl;
+        cout<<"Bot2: "<<shared_game->mano_bot2.size()<<endl;
+        cout<<"Bot3: "<<shared_game->mano_bot3.size()<<endl;
+    }
+    else if(shared_game->mano_bot2.size()==0){
+        cout<<"Ganó bot2, mejor suerte la próxima vez"<<endl;        
+        cout<<"Jugador: "<<shared_game->mano_jugador.size()<<endl;
+        cout<<"Bot1: "<<shared_game->mano_bot1.size()<<endl;
+        cout<<"Bot3: "<<shared_game->mano_bot3.size()<<endl;
+    }
+    else if(shared_game->mano_bot3.size()==0){
+        cout<<"Ganó bot3, mejor suerte la próxima vez"<<endl;
+        cout<<"Jugador: "<<shared_game->mano_jugador.size()<<endl;
+        cout<<"Bot1: "<<shared_game->mano_bot1.size()<<endl;
+        cout<<"Bot2: "<<shared_game->mano_bot2.size()<<endl;
+    }
+    else if(shared_game->mazo.size()==0){
+        cout<<endl<<"Mazo sin cartas"<<endl;
+        vector<vector<string>>vec;
+        vector<string>vecaux;
+        int cartj,cart1,cart2,cart3;
+        cartj=shared_game->mano_jugador.size();
+        cart1=shared_game->mano_bot1.size();
+        cart2=shared_game->mano_bot2.size();
+        cart3=shared_game->mano_bot3.size();
+        vecaux.push_back(to_string(cartj));
+        vecaux.push_back("Jugador");
+        vec.push_back(vecaux);
+        vecaux.clear();
+        vecaux.push_back(to_string(cart1));
+        vecaux.push_back("Bot1");
+        vec.push_back(vecaux);
+        vecaux.clear();
+        vecaux.push_back(to_string(cart2));
+        vecaux.push_back("Bot2");
+        vec.push_back(vecaux);
+        vecaux.clear();
+        vecaux.push_back(to_string(cart3));
+        vecaux.push_back("Bot3");
+        vec.push_back(vecaux);
+        vecaux.clear();
+        sort(vec.begin(),vec.end());
+        for(int i=0;i<4;i++){
+            if(i==0){
+                cout<<"Ganador: "<< vec[i][1]<<endl;
+                cout<<"Cantidad de cartas restantes de los demás juagdores:"<<endl;
+            }
+            else{
+                cout<<vec[i][1]<<": "<<vec[i][0]<<endl;
+            }
+        }
+    }
+    sleep(1);
     //Eliminar memoria compartida
     shmdt(shared_game);
     shmctl(mem, IPC_RMID, nullptr); 
