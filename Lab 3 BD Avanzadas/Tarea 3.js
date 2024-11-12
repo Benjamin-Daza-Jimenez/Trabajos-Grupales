@@ -37,7 +37,7 @@ async function crearTabla(){
     seller TEXT,
     transaction_history LIST<TUPLE<TEXT, TEXT>>,
     tags SET<TEXT>,
-    time_value LIST<FROZEN<TUPLE<TEXT, FLOAT>>>
+    time_value LIST<TUPLE<TEXT, FLOAT>>
     );
   `;
   try{
@@ -83,8 +83,23 @@ async function crear_estampillas(){
   }
 }
 
+//Eliminar BD
+async function borarBD() {
+  const keyspace = 'librepost';
+  const query = `DROP KEYSPACE IF EXISTS ${keyspace};`;
+  
+  try {
+    await client.execute(query);
+    console.log(`La base de datos "${keyspace}" ha sido eliminada exitosamente.`);
+  } catch (error) {
+    console.error('Error al intentar eliminar la base de datos:', error);
+  } finally {
+    await client.shutdown();
+  }
+}
+
 //Función para limpiar la tabla
-async function limpiarTabla() {
+async function limpiarTabla() {;
   const query = 'TRUNCATE stamps';
   try {
     await client.execute(query);
@@ -120,7 +135,7 @@ async function opciones(){
   console.log("(8) Ocupando vista materializada, mostrar las estampillas mas caras");
   console.log("(9) Agregar una estampilla en la base de datos");
   console.log("(10) Ocupando SASI, mostrar las estampillas mas baratas");
-  console.log("(11) Salir y limpiar tabla");
+  console.log("(11) Salir y borrar BD");
 }
 
 async function buscar_estampilla(){
@@ -132,17 +147,32 @@ async function buscar_estampilla(){
     SELECT * FROM stamps
     WHERE country = ? AND year = ? AND tags CONTAINS ? ALLOW FILTERING;
   `;
-  try{
+  try {
     const result = await client.execute(query, [country, year, tag], { prepare: true });
-    //console.log('Estampillas encontradas:', result.rows);1
     result.rows.forEach(row => {
-      // Convertir el UUID a una cadena de texto
-      const stampId = row.stamp_id.toString();
+      // Formatear los valores en time_value
+      const timeValueFormatted = row.time_value.map(tuple => ({
+        date: tuple.get(0),
+        value: tuple.get(1)
+      }));
+      
+      // Formatear los valores en transaction_history
+      const transactionHistoryFormatted = row.transaction_history.map(tuple => ({
+        date: tuple.get(0),
+        action: tuple.get(1)
+      }));
+      
+      // Crear un nuevo objeto sin el campo stamp_id
       const { stamp_id, ...dataWithoutId } = row;
-      console.log(`Estampilla encontrada - ID: ${stampId}, Datos:`, dataWithoutId);
+      
+      console.log(`Estampilla encontrada - ID: ${stamp_id.toString()}`);
+      console.log("Datos:", {
+        ...dataWithoutId,
+        time_value: timeValueFormatted,
+        transaction_history: transactionHistoryFormatted
+      });
     });
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error al ejecutar la consulta:', error);
   }
 }
@@ -302,33 +332,56 @@ async function time_value() {
   const modificar = await preguntar("Ingrese una opcion: ");
   const stampId = await preguntar("Ingrese id: ");
   const fecha = await preguntar("Ingrese fecha: ");
-  const nuevo_Monto = await preguntar("Ingrese time_value: ");
-  if(modificar == "1"){
-    const query = `
-      UPDATE stamps
-      SET time_value = time_value + [?]
-      WHERE stamp_id = ?;
+  const nuevoMonto = parseFloat(await preguntar("Ingrese monto: ")); // Convertir el monto a un número
+
+  if (modificar === "1") {
+    // Opción 1: Agregar nuevo registro
+    const querySelect = `
+      SELECT time_value FROM stamps WHERE stamp_id = ?;
     `;
     try {
-      await client.execute(query, [[fecha, nuevo_Monto], stampId], { prepare: true });
-      console.log(`Nuevo registro agregado a time_value para la estampilla ${stampId}.`);
-    } catch (error) {
-      console.error('Error al agregar nuevo registro a time_value:', error);
-    }
-  }
-  else if(modificar == "2"){
-    const querySELECT = `
-      SELECT time_value FROM stamps WHERE stamp_id = ?;
-    `;  
-    try {
+      // Obtén la lista time_value de la estampilla
       const result = await client.execute(querySelect, [stampId], { prepare: true });
       if (result.rowLength === 0) {
         console.log('Estampilla no encontrada.');
         return;
       }
       let timeValue = result.rows[0].time_value;
-      timeValue = timeValue.map(pair => (pair[0] === fecha ? [fecha, nuevo_Monto] : pair));
-      const query = `
+      // Crear un nuevo par (fecha, monto)
+      const { Tuple } = require('cassandra-driver').types;
+      const nuevoRegistro = new Tuple(fecha, nuevoMonto);
+      timeValue.push(nuevoRegistro);
+      const queryUpdate = `
+        UPDATE stamps
+        SET time_value = ?
+        WHERE stamp_id = ?;
+      `;
+      await client.execute(queryUpdate, [timeValue, stampId], { prepare: true });
+      console.log(`Nuevo registro agregado a time_value para la estampilla.`);
+    } catch (error) {
+      console.error('Error al agregar nuevo registro a time_value:', error);
+    }
+  } else if (modificar === "2") {
+    // Opción 2: Modificar un registro existente
+    const querySelect = `
+      SELECT time_value FROM stamps WHERE stamp_id = ?;
+    `;
+    try {
+      // Obtén la lista time_value de la estampilla
+      const result = await client.execute(querySelect, [stampId], { prepare: true });
+      if (result.rowLength === 0) {
+        console.log('Estampilla no encontrada.');
+        return;
+      }
+      let timeValue = result.rows[0].time_value;
+      const index = timeValue.findIndex(tuple => tuple.elements[0] === fecha);
+      timeValue.splice(index, 1);
+      // Crear un nuevo par (fecha, monto)
+      const { Tuple } = require('cassandra-driver').types;
+      const nuevoRegistro = new Tuple(fecha, nuevoMonto);
+      timeValue.push(nuevoRegistro);
+      // Reemplazar la lista completa en time_value
+      const queryUpdate = `
         UPDATE stamps
         SET time_value = ?
         WHERE stamp_id = ?;
@@ -338,6 +391,8 @@ async function time_value() {
     } catch (error) {
       console.error('Error al modificar registro en time_value:', error);
     }
+  } else {
+    console.log("Opción no válida.");
   }
 }
 
@@ -366,7 +421,7 @@ async function comprar() {
     }
     // Obtener la fecha actual
     const fechaCompra = new Date().toISOString().split('T')[0];
-    1
+    
     // Convertir la nueva transacción en una tupla
     const { Tuple } = require('cassandra-driver').types;
     const nuevaTransaccion = new Tuple(fechaCompra, 'compra');
@@ -616,6 +671,7 @@ async function main() {
       else if(opcion == "11"){
         flag = false;
         await limpiarTabla();
+        await borarBD();
       }
     }
 
